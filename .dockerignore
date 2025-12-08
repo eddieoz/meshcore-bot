@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist
+build
+.eggs
+
+# Virtual environments
+venv
+env
+ENV
+.venv
+
+# Databases (will be mounted as volumes)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs (will be mounted as volumes)
+*.log
+logs/
+
+# Configuration (will be mounted as volume)
+config.ini
+config.ini.example
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+.dockerignore
+
+# Documentation
+*.md
+!README.md
+
+# Service files
+*.service
+*.plist
+*.sh
+
+# Cache
+.cache.sqlite
+__pycache__/
+.pytest_cache/

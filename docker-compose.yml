@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  meshcore-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meshcore-bot
+    restart: unless-stopped
+
+    # Privileged mode for serial device access
+    privileged: true
+
+    # Device access for serial connection (requires privileged mode or device mapping)
+    # Uncomment the appropriate option based on your connection type
+
+    # Option 1: Privileged mode (simplest, but less secure)
+    # privileged: true
+
+    # Option 2: Specific device mapping (recommended for serial)
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0
+
+    # Port mappings
+    ports:
+      - "8083:8080" # Web viewer port
+
+    # Volume mappings
+    volumes:
+      # Configuration file (must exist before starting)
+      - ./config.ini:/app/config.ini:ro
+
+      # Data persistence (databases, logs)
+      - ./data:/app/data
+      - meshcore-logs:/app/logs
+
+      # Translations (optional, for localization)
+      - ./translations:/app/translations:ro
+
+    # Environment variables (optional overrides)
+    environment:
+      # Timezone (should match config.ini or override it)
+      - TZ=Europe/Tallinn
+
+      # Python settings
+      - PYTHONUNBUFFERED=1
+      # Optional: Override log level
+      # - LOG_LEVEL=INFO
+
+      # Network mode (default: bridge)
+      # For BLE connections, uncomment the following:
+      # network_mode: host
+
+      # User mapping (runs as uid 1000 by default)
+      # Adjust if needed to match your host user
+      # user: "1000:1000"
+      # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Named volumes for data persistence
+volumes:
+  meshcore-logs:
+    driver: local
+
+# Network configuration (optional)
+# networks:
+#   meshcore-network:
+#     driver: bridge

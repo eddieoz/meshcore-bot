@@ -1,0 +1,41 @@
+# Docker Compose Override Example
+# Copy this file to docker-compose.override.yml and customize for your environment
+# docker-compose.override.yml is automatically merged with docker-compose.yml
+
+version: '3.8'
+
+services:
+  meshcore-bot:
+    # Example 1: Override for different serial device
+    # devices:
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
+    
+    # Example 2: Override for TCP connection (no device needed)
+    # Comment out or remove the devices section entirely for TCP connections
+    # devices: []
+    
+    # Example 3: BLE connection (requires host network)
+    # network_mode: host
+    # devices: []
+    
+    # Example 4: Development mode with live code reload
+    # volumes:
+    #   - .:/app
+    #   - ./config.ini:/app/config.ini
+    
+    # Example 5: Custom environment variables
+    # environment:
+    #   - LOG_LEVEL=DEBUG
+    #   - TZ=America/New_York
+    
+    # Example 6: Alternative port mapping
+    # ports:
+    #   - "8888:8080"  # Map to different host port
+    
+    # Example 7: Privileged mode for USB device access
+    # privileged: true
+    # devices:
+    #   - /dev/bus/usb:/dev/bus/usb
+    
+    # Example 8: User mapping for permission alignment
+    # user: "1001:1001"

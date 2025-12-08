@@ -35,24 +35,24 @@ class GlobalWxCommand(BaseCommand):
         self.user_cooldowns = {}  # user_id -> last_execution_time
         
         # Get default state and country from config for city disambiguation
-        self.default_state = self.bot.config.get('Weather', 'default_state', fallback='WA')
-        self.default_country = self.bot.config.get('Weather', 'default_country', fallback='US')
+        self.default_state = self.bot.config.get('Weather', 'default_state', fallback='Tallinn')
+        self.default_country = self.bot.config.get('Weather', 'default_country', fallback='EE')
         
         # Get unit preferences from config
-        self.temperature_unit = self.bot.config.get('Weather', 'temperature_unit', fallback='fahrenheit').lower()
-        self.wind_speed_unit = self.bot.config.get('Weather', 'wind_speed_unit', fallback='mph').lower()
-        self.precipitation_unit = self.bot.config.get('Weather', 'precipitation_unit', fallback='inch').lower()
+        self.temperature_unit = self.bot.config.get('Weather', 'temperature_unit', fallback='celsius').lower()
+        self.wind_speed_unit = self.bot.config.get('Weather', 'wind_speed_unit', fallback='kmh').lower()
+        self.precipitation_unit = self.bot.config.get('Weather', 'precipitation_unit', fallback='mm').lower()
         
         # Validate units
         if self.temperature_unit not in ['fahrenheit', 'celsius']:
-            self.logger.warning(f"Invalid temperature_unit '{self.temperature_unit}', using 'fahrenheit'")
-            self.temperature_unit = 'fahrenheit'
+            self.logger.warning(f"Invalid temperature_unit '{self.temperature_unit}', using 'celsius'")
+            self.temperature_unit = 'celsius'
         if self.wind_speed_unit not in ['mph', 'kmh', 'ms']:
-            self.logger.warning(f"Invalid wind_speed_unit '{self.wind_speed_unit}', using 'mph'")
-            self.wind_speed_unit = 'mph'
+            self.logger.warning(f"Invalid wind_speed_unit '{self.wind_speed_unit}', using 'kmh'")
+            self.wind_speed_unit = 'kmh'
         if self.precipitation_unit not in ['inch', 'mm']:
-            self.logger.warning(f"Invalid precipitation_unit '{self.precipitation_unit}', using 'inch'")
-            self.precipitation_unit = 'inch'
+            self.logger.warning(f"Invalid precipitation_unit '{self.precipitation_unit}', using 'mm'")
+            self.precipitation_unit = 'mm'
         
         # Initialize geocoder (will use rate-limited helpers for actual calls)
         self.geolocator = get_nominatim_geocoder()

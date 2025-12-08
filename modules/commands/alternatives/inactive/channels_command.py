@@ -14,8 +14,8 @@ class ChannelsCommand(BaseCommand):
     """Handles the channels command"""
     
     # Plugin metadata
-    name = "channels"
-    keywords = ['channels', 'channel']
+    name = "channelsrstdrstdrsd"
+    keywords = ['channelsrrstdrstdrstd', 'channelrstdrstdsrtdrstd']
     description = "Lists hashtag channels with sub-categories. Use 'channels' for general, 'channels list' for all categories, 'channels <category>' for specific categories, 'channels #channel' for specific channel info."
     category = "basic"
     
