@@ -1574,6 +1574,11 @@ class MessageHandler:
                     await greeter_command.execute(message)
                 except Exception as e:
                     self.logger.error(f"Error executing greeter command: {e}")
+
+        # Process Store & Forward (BEFORE general message filtering)
+        # This allows S&F to work on its own configured channels even if not in bot's monitor_channels
+        if hasattr(self.bot, 'store_forward_manager') and self.bot.store_forward_manager:
+            self.bot.store_forward_manager.process_message(message)
         
         # Now check if we should process this message for bot responses
         if not self.should_process_message(message):
@@ -1586,9 +1591,6 @@ class MessageHandler:
             await self.bot.command_manager.handle_advert_command(message)
             return
         
-        # Process Store & Forward
-        if hasattr(self.bot, 'store_forward_manager') and self.bot.store_forward_manager:
-            self.bot.store_forward_manager.process_message(message)
 
         # Check for commands
         command_responses = self.bot.command_manager.check_keywords(message)
@@ -1639,9 +1641,6 @@ class MessageHandler:
     
     def should_process_message(self, message: MeshMessage) -> bool:
         """Check if message should be processed by the bot"""
-        # Process Store & Forward (Broadcasts)
-        if hasattr(self.bot, 'store_forward_manager') and self.bot.store_forward_manager:
-            self.bot.store_forward_manager.process_message(message)
 
         # Check for commands if enabled
         if not self.bot.config.getboolean('Bot', 'enabled', fallback=True):

@@ -112,36 +112,51 @@ class StoreForwardManager:
         Process an incoming message for storage.
         Returns True if stored, False otherwise.
         """
+        # self.logger.info("S&F: process_message called")
+        
         if not self.enabled:
+            self.logger.info("S&F: Disabled")
             return False
             
-        # Only store text messages
-        # Note: message object structure depends on how MessageHandler passes it.
-        # Assuming 'message' is a MeshMessage object or similar wrapper, 
-        # but the original plugin worked with raw packets. 
-        # Let's assume we receive the raw packet dict or a MeshMessage that exposes it.
-        
-        # If it's a MeshMessage object, extract needed data
-        if hasattr(message, 'packet'):
-            packet = message.packet
-        elif isinstance(message, dict):
-            packet = message
-        else:
-            return False
-
-        # Basic validation
+        # Extract packet from message if available, otherwise try to reconstruct or fail
+        packet = getattr(message, 'packet', None)
+        if not packet:
+            # Try to use raw packet if available
+            packet = getattr(message, 'raw', None)
+            
+        if not packet:
+            # Attempt to reconstruct packet from MeshMessage attributes
+            if hasattr(message, 'content') and hasattr(message, 'sender_id'):
+                self.logger.info("S&F: Reconstructing packet from MeshMessage")
+                packet = {
+                    'from': message.sender_id,
+                    'to': '^all' if not message.is_dm else 'self', # Approximate
+                    'decoded': {'text': message.content},
+                    'channel_name': message.channel,
+                    'id': getattr(message, 'id', None) or int(time.time())
+                }
+            else:
+                self.logger.info("S&F: No packet found in message and cannot reconstruct")
+                return False
+            
+        # Ensure packet has decoded text
         if 'decoded' not in packet or 'text' not in packet['decoded']:
+            self.logger.info("S&F: No decoded text in packet")
             return False
             
         text = packet['decoded']['text']
         # Ignore commands (starting with !)
         if text.startswith('!'):
+            self.logger.info(f"S&F: Ignoring command message: {text}")
             return False
 
         from_node = str(packet.get('from', packet.get('fromId')))
         to_node = str(packet.get('to', packet.get('toId')))
         
+        self.logger.info(f"S&F: Processing msg from {from_node} to {to_node} on channel {getattr(message, 'channel', 'None')}")
+        
         if not from_node or not to_node:
+            self.logger.info("S&F: Missing from/to node")
             return False
             
         # Check channel monitoring if configured
@@ -159,16 +174,19 @@ class StoreForwardManager:
         if self.monitor_channels and channel:
             # If monitor_channels is set, message channel MUST be in it
             if channel not in self.monitor_channels:
+                self.logger.info(f"S&F: Channel '{channel}' not in monitor list {self.monitor_channels}")
                 return False
 
         # Check filters
         if not self._check_filter(from_node, self.from_allow, self.from_disallow):
+            self.logger.info(f"S&F: Node {from_node} blocked by filters")
             return False
 
         is_broadcast = self._is_broadcast(to_node)
         
         if is_broadcast:
             if not self.store_broadcasts:
+                self.logger.info("S&F: Broadcast storage disabled")
                 return False
                 
             # Broadcast Logic
@@ -181,13 +199,16 @@ class StoreForwardManager:
                 return stored_count > 0
             else:
                 # Store as generic broadcast
+                self.logger.info(f"S&F: Storing broadcast from {from_node}")
                 self._store_single_message(packet, '^all', from_node)
                 return True
         else:
             # Directed Logic
             if not self._check_filter(to_node, self.to_allow, self.to_disallow):
+                self.logger.info(f"S&F: Destination {to_node} blocked by filters")
                 return False
             
+            self.logger.info(f"S&F: Storing directed message for {to_node}")
             self._store_single_message(packet, to_node, from_node)
             return True
 
@@ -233,19 +254,24 @@ class StoreForwardManager:
         except Exception as e:
             self.logger.error(f"Failed to enforce limit: {e}")
 
-    async def deliver_messages(self, requesting_node_id: str):
+    async def deliver_messages(self, requesting_node_id: str, channel_filter: Optional[str] = None):
         """
         Deliver stored messages to the requesting node.
         Includes:
         1. Directed messages (marked delivered).
         2. Broadcast messages (tracked via receipts).
+        
+        Args:
+            requesting_node_id: The node ID requesting messages.
+            channel_filter: If set, only return broadcast messages from this channel. 
+                            If None, return NO broadcast messages (only DMs).
         """
         if not self.enabled or not requesting_node_id:
             return
 
         requesting_node_id = str(requesting_node_id)
         
-        # 1. Get Directed Messages
+        # 1. Get Directed Messages (Always deliver DMs)
         directed_msgs = self.db_manager.execute_query('''
             SELECT id, packet_json, from_node, created_at
             FROM store_forward_messages
@@ -253,19 +279,37 @@ class StoreForwardManager:
             ORDER BY created_at ASC
         ''', (requesting_node_id,))
         
-        # 2. Get Broadcast Messages (not yet received by this node)
-        # Select messages where to_node is ^all AND id is NOT in receipts for this node
-        broadcast_msgs = self.db_manager.execute_query('''
-            SELECT m.id, m.packet_json, m.from_node, m.created_at
-            FROM store_forward_messages m
-            WHERE m.to_node = '^all' 
-            AND m.expires_at > ?
-            AND NOT EXISTS (
-                SELECT 1 FROM store_forward_receipts r 
-                WHERE r.message_id = m.id AND r.node_id = ?
-            )
-            ORDER BY m.created_at ASC
-        ''', (int(time.time()), requesting_node_id))
+        # 2. Get Broadcast Messages (Only if channel_filter is set)
+        broadcast_msgs = []
+        if channel_filter:
+            # Select messages where to_node is ^all AND id is NOT in receipts for this node
+            raw_broadcasts = self.db_manager.execute_query('''
+                SELECT m.id, m.packet_json, m.from_node, m.created_at
+                FROM store_forward_messages m
+                WHERE m.to_node = '^all' 
+                AND m.expires_at > ?
+                AND NOT EXISTS (
+                    SELECT 1 FROM store_forward_receipts r 
+                    WHERE r.message_id = m.id AND r.node_id = ?
+                )
+                ORDER BY m.created_at ASC
+            ''', (int(time.time()), requesting_node_id))
+            
+            # Filter by channel in Python
+            for msg in raw_broadcasts:
+                try:
+                    packet = json.loads(msg['packet_json'])
+                    msg_channel = packet.get('channel_name')
+                    # Check if channel matches (case-insensitive?)
+                    # Let's assume exact match or case-insensitive match is safer.
+                    # Channels are usually case-sensitive in config but maybe not in usage.
+                    # Let's try exact match first, or case-insensitive if needed.
+                    if msg_channel and msg_channel.lower() == channel_filter.lower():
+                        broadcast_msgs.append(msg)
+                except Exception as e:
+                    self.logger.error(f"Error parsing packet JSON for filtering: {e}")
+        
+        self.logger.info(f"S&F: Found {len(directed_msgs)} directed and {len(broadcast_msgs)} broadcast messages for {requesting_node_id} (Filter: {channel_filter})")
         
         all_messages = directed_msgs + broadcast_msgs
         
