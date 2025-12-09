@@ -14,7 +14,7 @@ class HelpCommand(BaseCommand):
     # Plugin metadata
     name = "help"
     keywords = ['!help']
-    description = "Shows commands. Use 'help <command>' for details."
+    description = "Show available commands. Use '!help <command>' for details."
     category = "basic"
     
     def get_help_text(self) -> str:

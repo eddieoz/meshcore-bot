@@ -28,6 +28,8 @@ class DBManager:
         'complete_contact_tracking',  # Repeater manager
         'daily_stats',  # Repeater manager
         'purging_log',  # Repeater manager
+        'store_forward_messages',
+        'store_forward_receipts',
     }
     
     def __init__(self, bot, db_path: str = "meshcore_bot.db"):

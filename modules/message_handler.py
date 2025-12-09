@@ -1586,13 +1586,17 @@ class MessageHandler:
             await self.bot.command_manager.handle_advert_command(message)
             return
         
-        # Check for keywords and custom syntax
-        keyword_matches = self.bot.command_manager.check_keywords(message)
+        # Process Store & Forward
+        if hasattr(self.bot, 'store_forward_manager') and self.bot.store_forward_manager:
+            self.bot.store_forward_manager.process_message(message)
+
+        # Check for commands
+        command_responses = self.bot.command_manager.check_keywords(message)
         
         help_response_sent = False
         plugin_command_with_response_matched = False
-        if keyword_matches:
-            for keyword, response in keyword_matches:
+        if command_responses:
+            for keyword, response in command_responses:
                 # Use translator if available for logging
                 if hasattr(self.bot, 'translator'):
                     log_msg = self.bot.translator.translate('messages.keyword_matched', keyword=keyword)
@@ -1635,8 +1639,12 @@ class MessageHandler:
     
     def should_process_message(self, message: MeshMessage) -> bool:
         """Check if message should be processed by the bot"""
-        # Check if bot is enabled
-        if not self.bot.config.getboolean('Bot', 'enabled'):
+        # Process Store & Forward (Broadcasts)
+        if hasattr(self.bot, 'store_forward_manager') and self.bot.store_forward_manager:
+            self.bot.store_forward_manager.process_message(message)
+
+        # Check for commands if enabled
+        if not self.bot.config.getboolean('Bot', 'enabled', fallback=True):
             return False
         
         # Check if sender is banned

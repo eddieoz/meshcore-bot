@@ -289,7 +289,7 @@ class StatsCommand(BaseCommand):
                 else:
                     response = self.translate('commands.stats.unknown_subcommand', subcommand=subcommand)
             else:
-                response = await self._get_basic_stats()
+                response = await self._get_basic_stats(message.sender_id)
             
             # Record this command execution
             self.record_command(message, 'stats', True)
@@ -301,7 +301,7 @@ class StatsCommand(BaseCommand):
             await self.send_response(message, self.translate('commands.stats.error', error=str(e)))
             return False
     
-    async def _get_basic_stats(self) -> str:
+    async def _get_basic_stats(self, sender_id: str = None) -> str:
         """Get basic bot statistics"""
         try:
             # Get time window (24 hours ago)
@@ -359,6 +359,16 @@ class StatsCommand(BaseCommand):
 {self.translate('commands.stats.basic.commands', count=commands_received, replies=bot_replies)}
 {self.translate('commands.stats.basic.top_command', command=top_command)}
 {self.translate('commands.stats.basic.top_user', user=top_user)}"""
+
+                # Add Store & Forward stats if enabled
+                if hasattr(self.bot, 'store_forward_manager') and self.bot.store_forward_manager and self.bot.store_forward_manager.enabled:
+                    sf_stats = self.bot.store_forward_manager.get_stats_for_node(sender_id)
+                    if sf_stats and sf_stats['total'] > 0:
+                        response += f"\n\nStore & Forward:\nMessages waiting: {sf_stats['total']} ({sf_stats['directed']} directed, {sf_stats['broadcast']} broadcast)"
+                    else:
+                        response += "\n\nStore & Forward: No messages waiting."
+                
+                return response
                 
                 return response
                 

@@ -284,8 +284,8 @@ class BaseCommand(ABC):
         
         # Strip exclamation mark if present (for command-style messages)
         content = message.content.strip()
-        if content.startswith('!'):
-            content = content[1:].strip()
+        # if content.startswith('!'):
+        #     content = content[1:].strip()
         content_lower = content.lower()
         
         for keyword in self.keywords:

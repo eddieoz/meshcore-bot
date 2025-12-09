@@ -133,8 +133,11 @@ test_*.db
 test_*.log
 *_test.py
 *_test.db
+!test_command.py
 
 # Local documentation and development files
 docs/local/
 tests/
 test_scripts/
+meshtastic-bridge/
+meshtastic-bridge

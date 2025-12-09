@@ -449,6 +449,32 @@ url_timeout = 10
 # false: Use 12-hour local format
 use_zulu_time = false
 
+[StoreForward]
+# Enable Store & Forward functionality
+enabled = true
+
+# Time to live for stored messages in hours
+ttl_hours = 48
+
+# How long to keep delivered messages (grace period) in hours
+delivered_retention_hours = 2
+
+# Maximum messages to store per node
+max_messages_per_node = 500
+
+# Store broadcast messages
+# If true, broadcasts will be stored and delivered to anyone who asks
+store_broadcasts = true
+
+# Allow/Disallow lists for destination nodes (Comma-separated Node IDs)
+# to_allow: Empty = Allow All (for Directed), Store as Broadcast (for Broadcasts)
+to_allow = 
+to_disallow = 
+
+# Allow/Disallow lists for sender nodes
+from_allow = 
+from_disallow =
+
 [Channels_List]
 # Common hashtag channels for the region
 # Format: channel_name = description

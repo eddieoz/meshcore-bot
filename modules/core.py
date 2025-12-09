@@ -35,7 +35,9 @@ from .db_manager import DBManager
 from .i18n import Translator
 from .solar_conditions import set_config
 from .web_viewer.integration import WebViewerIntegration
+from .web_viewer.integration import WebViewerIntegration
 from .security_utils import validate_safe_path
+from .store_forward import StoreForwardManager
 
 
 class MeshCoreBot:
@@ -143,6 +145,16 @@ class MeshCoreBot:
         except Exception as e:
             self.logger.error(f"Failed to initialize repeater manager: {e}")
             raise
+            
+        # Initialize Store & Forward manager
+        self.logger.info("Initializing Store & Forward manager")
+        try:
+            self.store_forward_manager = StoreForwardManager(self)
+            self.logger.info("Store & Forward manager initialized successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Store & Forward manager: {e}")
+            # Don't raise, just disable it
+            self.store_forward_manager = None
         
         # Reload translated keywords for all commands now that translator is available
         # This ensures keywords are loaded even if translator wasn't ready during command init

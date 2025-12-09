@@ -140,13 +140,13 @@ class CommandManager:
         matches = []
         # Strip exclamation mark if present (for command-style messages)
         content = message.content.strip()
-        if content.startswith('!'):
-            content = content[1:].strip()
+        # if content.startswith('!'):
+        #     content = content[1:].strip()
         content_lower = content.lower()
         
         # Check for help requests first (special handling)
-        # Check both English "help" and translated help keywords
-        help_keywords = ['help']
+        # Check both English "!help" and translated help keywords
+        help_keywords = ['!help']
         if 'help' in self.commands:
             help_command = self.commands['help']
             if hasattr(help_command, 'keywords'):
