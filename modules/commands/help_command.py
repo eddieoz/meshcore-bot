@@ -13,7 +13,7 @@ class HelpCommand(BaseCommand):
     
     # Plugin metadata
     name = "help"
-    keywords = ['help']
+    keywords = ['!help']
     description = "Shows commands. Use 'help <command>' for details."
     category = "basic"
     
@@ -32,10 +32,10 @@ class HelpCommand(BaseCommand):
         # Map command aliases to their actual command names
         command_aliases = {
             't': 't_phrase',
-            'advert': 'advert',
+            '!advert': 'advert',
             'test': 'test',
             'ping': 'ping',
-            'help': 'help'
+            '!help': '!help'
         }
         
         # Normalize the command name

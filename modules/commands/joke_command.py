@@ -17,8 +17,8 @@ class JokeCommand(BaseCommand):
     
     # Plugin metadata
     name = "joke"
-    keywords = ['joke', 'jokes']
-    description = "Get a random joke or joke from specific category (usage: joke [category])"
+    keywords = ['!joke', '!jokes']
+    description = "Get a random joke or joke from specific category (usage: !joke [category])"
     category = "entertainment"
     cooldown_seconds = 3  # 3 second cooldown per user to prevent API abuse
     requires_dm = False  # Works in both channels and DMs
@@ -65,8 +65,8 @@ class JokeCommand(BaseCommand):
     def matches_keyword(self, message: MeshMessage) -> bool:
         """Check if message starts with a joke keyword"""
         content = message.content.strip()
-        if content.startswith('!'):
-            content = content[1:].strip()
+        # if content.startswith('!'):
+        #     content = content[1:].strip()
         content_lower = content.lower()
         for keyword in self.keywords:
             # Match if keyword is at start followed by space or end of message

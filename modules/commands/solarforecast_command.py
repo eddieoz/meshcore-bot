@@ -23,8 +23,8 @@ class SolarforecastCommand(BaseCommand):
     
     # Plugin metadata
     name = "solarforecast"
-    keywords = ['solarforecast', 'sf']
-    description = "Get solar panel production forecast (usage: sf <location|repeater_name|coordinates|zipcode> [panel_size] [azimuth, 0=south] [angle])"
+    keywords = ['!solarforecast', '!sf']
+    description = "Get solar panel production forecast (usage: !solarforecast <location|repeater_name|coordinates|zipcode> [panel_size] [azimuth, 0=south] [angle])"
     category = "solar"
     cooldown_seconds = 10  # 10 second cooldown per user
     

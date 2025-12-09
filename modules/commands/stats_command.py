@@ -17,8 +17,8 @@ class StatsCommand(BaseCommand):
     
     # Plugin metadata
     name = "stats"
-    keywords = ['stats']
-    description = "Show statistics for past 24 hours. Use 'stats messages', 'stats channels', or 'stats paths' for specific stats."
+    keywords = ['!stats']
+    description = "Show statistics for past 24 hours. Use '!stats messages', '!stats channels', or '!stats paths' for specific stats."
     category = "analytics"
     
     def __init__(self, bot):

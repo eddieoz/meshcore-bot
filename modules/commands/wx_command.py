@@ -21,8 +21,8 @@ class WxCommand(BaseCommand):
     
     # Plugin metadata
     name = "wx"
-    keywords = ['wx', 'weather', 'wxa', 'wxalert']
-    description = "Get weather information for a zip code (usage: wx 12345)"
+    keywords = ['!wx', '!weather', '!wxa', '!wxalert']
+    description = "Get weather information for a zip code (usage: !wx 12345)"
     category = "weather"
     cooldown_seconds = 5  # 5 second cooldown per user to prevent API abuse
     
@@ -58,8 +58,8 @@ class WxCommand(BaseCommand):
     def matches_keyword(self, message: MeshMessage) -> bool:
         """Check if message starts with a weather keyword"""
         content = message.content.strip()
-        if content.startswith('!'):
-            content = content[1:].strip()
+        # if content.startswith('!'):
+        #     content = content[1:].strip()
         content_lower = content.lower()
         for keyword in self.keywords:
             if content_lower.startswith(keyword + ' '):

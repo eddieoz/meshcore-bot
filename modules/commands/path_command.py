@@ -18,7 +18,7 @@ class PathCommand(BaseCommand):
     
     # Plugin metadata
     name = "path"
-    keywords = ["path", "decode", "route"]
+    keywords = ["!path", "!decode", "!route"]
     description = "Decode hex path data to show which repeaters were involved in message routing"
     requires_dm = False
     cooldown_seconds = 1

@@ -13,7 +13,7 @@ class SolarCommand(BaseCommand):
     
     # Plugin metadata
     name = "solar"
-    keywords = ['solar']
+    keywords = ['!solar']
     description = "Get solar conditions and HF band status"
     category = "solar"
     

@@ -13,7 +13,7 @@ class MoonCommand(BaseCommand):
     
     # Plugin metadata
     name = "moon"
-    keywords = ['moon']
+    keywords = ['!moon']
     description = "Get moon phase, rise/set times and position"
     category = "solar"
     

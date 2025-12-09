@@ -14,7 +14,7 @@ class AdvertCommand(BaseCommand):
     
     # Plugin metadata
     name = "advert"
-    keywords = ['advert']
+    keywords = ['!advert']
     description = "Sends flood advert (DM only, 1hr cooldown)"
     requires_dm = True
     cooldown_seconds = 3600  # 1 hour

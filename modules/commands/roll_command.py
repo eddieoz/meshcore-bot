@@ -15,7 +15,7 @@ class RollCommand(BaseCommand):
     
     # Plugin metadata
     name = "roll"
-    keywords = ['roll']
+    keywords = ['!roll']
     description = "Roll a random number between 1 and X (default 100). Use 'roll' for 1-100, 'roll 50' for 1-50, etc."
     category = "games"
     
@@ -27,19 +27,19 @@ class RollCommand(BaseCommand):
         content = message.content.strip().lower()
         
         # Handle command-style messages
-        if content.startswith('!'):
-            content = content[1:].strip().lower()
+        # if content.startswith('!'):
+        #     content = content[1:].strip().lower()
         
         # Check for exact "roll" match
-        if content == "roll":
+        if content == "!roll":
             return True
         
         # Check for roll with parameters (roll 50, roll 1000, etc.)
         # Ensure "roll" is the first word and followed by valid number
-        if content.startswith("roll "):
+        if content.startswith("!roll "):
             words = content.split()
-            if len(words) >= 2 and words[0] == "roll":
-                roll_part = content[5:].strip()  # Get everything after "roll "
+            if len(words) >= 2 and words[0] == "!roll":
+                roll_part = content[6:].strip()  # Get everything after "roll "
                 # Check if the roll part is valid number notation (not just any word)
                 max_num = self.parse_roll_notation(roll_part)
                 return max_num is not None  # Only match if it's valid number notation

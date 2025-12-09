@@ -15,8 +15,8 @@ class DiceCommand(BaseCommand):
     
     # Plugin metadata
     name = "dice"
-    keywords = ['dice']
-    description = "Roll dice for D&D and tabletop games. Use 'dice' for d6, 'dice d20' for d20, 'dice 2d6' for 2d6, etc."
+    keywords = ['!dice']
+    description = "Roll dice for D&D and tabletop games. Use '!dice' for d6, '!dice d20' for d20, '!dice 2d6' for 2d6, etc."
     category = "games"
     
     # Standard D&D dice types
@@ -37,20 +37,20 @@ class DiceCommand(BaseCommand):
         """Override to handle dice-specific matching"""
         content = message.content.strip().lower()
         
-        # Handle command-style messages
-        if content.startswith('!'):
-            content = content[1:].strip().lower()
+        # # Handle command-style messages
+        # if content.startswith('!'):
+        #     content = content[1:].strip().lower()
         
         # Check for exact "dice" match
-        if content == "dice":
+        if content == "!dice":
             return True
         
         # Check for dice with parameters (dice d20, dice 20, dice d6, etc.)
         # Ensure "dice" is the first word and followed by valid dice notation
-        if content.startswith("dice "):
+        if content.startswith("!dice "):
             words = content.split()
-            if len(words) >= 2 and words[0] == "dice":
-                dice_part = content[5:].strip()  # Get everything after "dice "
+            if len(words) >= 2 and words[0] == "!dice":
+                dice_part = content[6:].strip()  # Get everything after "dice "
                 # Check if the dice part is valid dice notation (not just any word)
                 sides, count = self.parse_dice_notation(dice_part)
                 return sides is not None  # Only match if it's valid dice notation

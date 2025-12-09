@@ -13,7 +13,7 @@ class SunCommand(BaseCommand):
     
     def __init__(self, bot):
         super().__init__(bot)
-        self.keywords = ['sun']
+        self.keywords = ['!sun']
     
     async def execute(self, message: MeshMessage) -> bool:
         """Execute the sun command"""

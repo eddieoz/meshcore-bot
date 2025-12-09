@@ -18,8 +18,8 @@ class GlobalWxCommand(BaseCommand):
     
     # Plugin metadata
     name = "gwx"
-    keywords = ['gwx', 'globalweather', 'gwxa']
-    description = "Get weather information for any global location (usage: gwx Tokyo)"
+    keywords = ['!gwx', '!globalweather', '!gwxa']
+    description = "Get weather information for any global location (usage: !gwx Tokyo)"
     category = "weather"
     cooldown_seconds = 5  # 5 second cooldown per user to prevent API abuse
     
@@ -66,8 +66,8 @@ class GlobalWxCommand(BaseCommand):
     def matches_keyword(self, message: MeshMessage) -> bool:
         """Check if message starts with a weather keyword"""
         content = message.content.strip()
-        if content.startswith('!'):
-            content = content[1:].strip()
+        # if content.startswith('!'):
+        #     content = content[1:].strip()
         content_lower = content.lower()
         for keyword in self.keywords:
             if content_lower.startswith(keyword + ' '):
