@@ -6,6 +6,7 @@ Handles storage and delivery of messages for offline nodes or on-demand retrieva
 
 import json
 import time
+import asyncio
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -433,8 +434,34 @@ class StoreForwardManager:
                 
                 msg_content = f"{prefix}[{timestamp}] {msg['from_node']}: {text}"
                 
-                # Send via DM for privacy
-                if await send_private(msg_content):
+                # Send via DM for privacy with rate limit waiting
+                # Retry up to 3 times if rate limited, waiting for the rate limit to clear
+                max_retries = 3
+                sent = False
+                for attempt in range(max_retries):
+                    # Check if rate limited and wait if needed (before attempting send)
+                    if hasattr(self.bot, 'rate_limiter') and not self.bot.rate_limiter.can_send():
+                        wait_time = self.bot.rate_limiter.time_until_next()
+                        if wait_time > 0:
+                            self.logger.info(f"S&F: Rate limited, waiting {wait_time:.1f}s before sending message {count + 1} of {len(all_messages)}")
+                            await asyncio.sleep(wait_time + 0.5)  # Add small buffer
+                    
+                    if await send_private(msg_content):
+                        sent = True
+                        break
+                    else:
+                        # Send failed, check if it was due to rate limiting
+                        if hasattr(self.bot, 'rate_limiter'):
+                            wait_time = self.bot.rate_limiter.time_until_next()
+                            if wait_time > 0 and attempt < max_retries - 1:
+                                self.logger.info(f"S&F: Send failed (rate limit), waiting {wait_time:.1f}s before retry {attempt + 2}/{max_retries}")
+                                await asyncio.sleep(wait_time + 0.5)  # Add small buffer
+                            else:
+                                break  # Not rate limited or max retries reached
+                        else:
+                            break  # No rate limiter, don't retry
+                
+                if sent:
                     count += 1
                     # Mark as delivered or add receipt
                     if packet.get('to') == '^all':
@@ -451,11 +478,18 @@ class StoreForwardManager:
                             WHERE id = ?
                         ''', (int(time.time()), msg['id']))
                 else:
-                    self.logger.warning(f"Failed to deliver message {msg['id']} to {sender_name or message.sender_id}")
+                    self.logger.warning(f"S&F: Failed to deliver message {msg['id']} to {sender_name or message.sender_id} after {max_retries} attempts")
                     
             except Exception as e:
                 self.logger.error(f"Error delivering message {msg['id']}: {e}")
-                
+        
+        # Send summary with rate limit waiting
+        if hasattr(self.bot, 'rate_limiter') and not self.bot.rate_limiter.can_send():
+            wait_time = self.bot.rate_limiter.time_until_next()
+            if wait_time > 0:
+                self.logger.info(f"S&F: Rate limited, waiting {wait_time:.1f}s before sending summary")
+                await asyncio.sleep(wait_time + 0.5)
+        
         await send_private(f"Delivered {count} messages.")
 
     def _format_message_for_delivery(self, packet: Dict, from_node: str, created_at: int) -> str:
