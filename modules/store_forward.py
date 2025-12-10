@@ -254,15 +254,18 @@ class StoreForwardManager:
         except Exception as e:
             self.logger.error(f"Failed to enforce limit: {e}")
 
-    async def deliver_messages(self, requesting_node_id: str, channel_filter: Optional[str] = None):
+    async def deliver_messages(self, message, requesting_node_id: str, channel_filter: Optional[str] = None):
         """
-        Deliver stored messages to the requesting node.
+        Deliver stored messages to the requesting node via DM (for privacy).
+        Always responds via DM even if command was issued in a channel.
+        
         Includes:
         1. Directed messages (marked delivered).
         2. Broadcast messages (tracked via receipts).
         
         Args:
-            requesting_node_id: The node ID requesting messages.
+            message: The original MeshMessage (used for send_response).
+            requesting_node_id: The hex node ID requesting messages (for DB queries).
             channel_filter: If set, only return broadcast messages from this channel. 
                             If None, return NO broadcast messages (only DMs).
         """
@@ -270,6 +273,17 @@ class StoreForwardManager:
             return
 
         requesting_node_id = str(requesting_node_id)
+        
+        # For privacy: always send via DM. Determine how to send based on message source.
+        # - If message is a DM: use send_response (works like !path, !help)
+        # - If message is from channel: look up sender name and use send_dm directly
+        
+        sender_name = None
+        if not message.is_dm:
+            # Channel message - need to look up sender name for DM
+            # For channel messages, message.sender_id is usually the name (e.g., "🛸 mc/M2")
+            sender_name = message.sender_id
+            self.logger.info(f"S&F: Channel message from '{sender_name}', will respond via DM for privacy")
         
         # 1. Get Directed Messages (Always deliver DMs)
         directed_msgs = self.db_manager.execute_query('''
@@ -300,10 +314,6 @@ class StoreForwardManager:
                 try:
                     packet = json.loads(msg['packet_json'])
                     msg_channel = packet.get('channel_name')
-                    # Check if channel matches (case-insensitive?)
-                    # Let's assume exact match or case-insensitive match is safer.
-                    # Channels are usually case-sensitive in config but maybe not in usage.
-                    # Let's try exact match first, or case-insensitive if needed.
                     if msg_channel and msg_channel.lower() == channel_filter.lower():
                         broadcast_msgs.append(msg)
                 except Exception as e:
@@ -313,41 +323,62 @@ class StoreForwardManager:
         
         all_messages = directed_msgs + broadcast_msgs
         
+        # Helper function to send message (DM for privacy)
+        async def send_private(content: str) -> bool:
+            if message.is_dm:
+                # DM: use send_response like other commands (!path, !help)
+                return await self.bot.command_manager.send_response(message, content)
+            else:
+                # Channel: send DM to sender for privacy
+                return await self.bot.command_manager.send_dm(sender_name, content)
+        
         if not all_messages:
-            await self.bot.command_manager.send_dm(requesting_node_id, "No stored messages found.")
+            await send_private("No stored messages found.")
             return
 
-        self.logger.info(f"Delivering {len(all_messages)} messages to {requesting_node_id}")
+        self.logger.info(f"Delivering {len(all_messages)} messages to {sender_name or message.sender_id}")
         
         count = 0
         for msg in all_messages:
             try:
-                msg_id = msg['id']
                 packet = json.loads(msg['packet_json'])
-                from_node = msg['from_node']
-                created_at = msg['created_at']
+                decoded = packet.get('decoded', {})
+                text = decoded.get('text', '')
                 
-                # Format Message
-                formatted_text = self._format_message_for_delivery(packet, from_node, created_at)
+                # Format message
+                timestamp = self._format_timestamp(msg['created_at'])
+                # If it's a broadcast, indicate channel
+                prefix = ""
+                if packet.get('to') == '^all':
+                    channel_name = packet.get('channel_name', 'Unknown')
+                    prefix = f"[{channel_name}] "
                 
-                # Send DM
-                success = await self.bot.command_manager.send_dm(requesting_node_id, formatted_text)
+                msg_content = f"{prefix}[{timestamp}] {msg['from_node']}: {text}"
                 
-                if success:
+                # Send via DM for privacy
+                if await send_private(msg_content):
                     count += 1
-                    # Mark as delivered / Add receipt
-                    if msg in directed_msgs:
-                        self._mark_directed_delivered(msg_id)
+                    # Mark as delivered or add receipt
+                    if packet.get('to') == '^all':
+                        # Add receipt for broadcast
+                        self.db_manager.execute_update('''
+                            INSERT OR IGNORE INTO store_forward_receipts (message_id, node_id, delivered_at)
+                            VALUES (?, ?, ?)
+                        ''', (msg['id'], requesting_node_id, int(time.time())))
                     else:
-                        self._add_broadcast_receipt(msg_id, requesting_node_id)
-                    
-                    # Rate limit delivery
-                    await asyncio.sleep(1)
+                        # Mark directed message as delivered
+                        self.db_manager.execute_update('''
+                            UPDATE store_forward_messages 
+                            SET delivered = 1, delivered_at = ? 
+                            WHERE id = ?
+                        ''', (int(time.time()), msg['id']))
+                else:
+                    self.logger.warning(f"Failed to deliver message {msg['id']} to {sender_name or message.sender_id}")
                     
             except Exception as e:
                 self.logger.error(f"Error delivering message {msg['id']}: {e}")
-
-        await self.bot.command_manager.send_dm(requesting_node_id, f"Delivered {count} messages.")
+                
+        await send_private(f"Delivered {count} messages.")
 
     def _format_message_for_delivery(self, packet: Dict, from_node: str, created_at: int) -> str:
         """Format the message with metadata"""

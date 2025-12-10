@@ -225,11 +225,29 @@ class CommandManager:
         await self._apply_tx_delay()
         
         try:
-            # Find the contact by name (since recipient_id is the contact name)
+            # 1. Try to find the contact by name (standard method)
             contact = self.bot.meshcore.get_contact_by_name(recipient_id)
+            
+            # 2. If not found by name, try to find by ID in contacts list
+            if not contact and hasattr(self.bot.meshcore, 'contacts'):
+                # Check direct ID match
+                if recipient_id in self.bot.meshcore.contacts:
+                    contact = self.bot.meshcore.contacts[recipient_id]
+                # Check ID with '!' prefix (common in meshcore)
+                elif f"!{recipient_id}" in self.bot.meshcore.contacts:
+                    contact = self.bot.meshcore.contacts[f"!{recipient_id}"]
+            
+            # 3. If still not found, check if recipient_id is a valid hex ID (Fallback for unknown nodes)
             if not contact:
-                self.logger.error(f"Contact not found for name: {recipient_id}")
-                return False
+                # Check if it looks like a hex ID (8-12 chars, hex)
+                import re
+                if re.match(r'^[0-9a-fA-F]{8,12}$', recipient_id):
+                    # It's a hex ID, create a temporary contact object or use ID directly
+                    self.logger.debug(f"Contact not found by name/ID, using ID directly: {recipient_id}")
+                    contact = {'id': recipient_id, 'name': recipient_id, 'num': int(recipient_id, 16)}
+                else:
+                    self.logger.error(f"Contact not found for name: {recipient_id}")
+                    return False
             
             # Use the contact name for logging
             contact_name = contact.get('name', contact.get('adv_name', recipient_id))

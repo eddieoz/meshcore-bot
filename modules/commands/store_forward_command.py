@@ -81,8 +81,25 @@ class StoreForwardCommand(BaseCommand):
             
         # Fallback: if node_id is still long, truncate it to 12 chars (standard Meshtastic ID length in this setup)
         # This handles cases where the full public key is passed as sender_id
+        # Fallback: if node_id is still long, truncate it to 12 chars (standard Meshtastic ID length in this setup)
+        # This handles cases where the full public key is passed as sender_id
         if len(node_id) > 12:
             node_id = node_id[:12]
+            
+        # Update contact with public key if available in message
+        # This is critical for send_dm to work if the contact was previously incomplete
+        if hasattr(message, 'sender_pubkey') and message.sender_pubkey:
+            if hasattr(self.bot, 'meshcore') and hasattr(self.bot.meshcore, 'contacts'):
+                contact_key = node_id
+                # Try with ! prefix if not present
+                if contact_key not in self.bot.meshcore.contacts and f"!{contact_key}" in self.bot.meshcore.contacts:
+                    contact_key = f"!{contact_key}"
+                
+                if contact_key in self.bot.meshcore.contacts:
+                    contact = self.bot.meshcore.contacts[contact_key]
+                    if not contact.get('public_key'):
+                        self.bot.logger.info(f"Updating contact {node_id} with public key from message")
+                        contact['public_key'] = message.sender_pubkey
         
         # Determine channel filter
         channel_filter = None
@@ -107,5 +124,5 @@ class StoreForwardCommand(BaseCommand):
                 # No argument in DM -> No broadcast messages (only DMs)
                 channel_filter = None
         
-        await self.bot.store_forward_manager.deliver_messages(node_id, channel_filter)
+        await self.bot.store_forward_manager.deliver_messages(message, node_id, channel_filter)
         return True
