@@ -141,7 +141,7 @@ admin_pubkeys =
 
 # Commands that require admin access (comma-separated)
 # These commands will only work for users in the admin_pubkeys list
-admin_commands = repeater,webviewer,webviewer
+admin_commands = repeater,webviewer
 
 [Plugin_Overrides]
 # Plugin Overrides - Use alternative plugin implementations
@@ -474,6 +474,21 @@ to_disallow =
 # Allow/Disallow lists for sender nodes
 from_allow = 
 from_disallow =
+
+# Security: Rate limiting for message storage (DoS protection)
+# Maximum messages to store across all nodes (prevents unbounded database growth)
+max_total_messages = 10000
+
+# Rate limiting window in seconds
+rate_limit_window = 60
+
+# Maximum messages to store within rate limit window
+rate_limit_count = 100
+
+# Channels to monitor for Store & Forward (comma-separated)
+# If empty, monitors all channels (subject to other filters)
+# If set, only stores messages from these channels
+monitor_channels = 
 
 [Channels_List]
 # Common hashtag channels for the region

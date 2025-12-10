@@ -9,6 +9,10 @@ import time
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+from collections import deque
+
+# Security utilities
+from .security_utils import sanitize_input, validate_node_id, validate_packet_json
 
 class StoreForwardManager:
     """
@@ -36,6 +40,12 @@ class StoreForwardManager:
         self.from_allow = self._load_list_config('from_allow')
         self.from_disallow = self._load_list_config('from_disallow')
         self.monitor_channels = self._load_list_config('monitor_channels')
+        
+        # Security: Rate limiting configuration
+        self.max_total_messages = self.bot.config.getint('StoreForward', 'max_total_messages', fallback=10000)
+        self.rate_limit_window = self.bot.config.getint('StoreForward', 'rate_limit_window', fallback=60)
+        self.rate_limit_count = self.bot.config.getint('StoreForward', 'rate_limit_count', fallback=100)
+        self._message_timestamps = deque(maxlen=self.rate_limit_count * 2)  # Rolling window
         
         if self.enabled:
             self._init_database()
@@ -82,8 +92,45 @@ class StoreForwardManager:
         try:
             dt = datetime.fromtimestamp(int(timestamp))
             return dt.strftime("%Y-%m-%d %H:%M:%S")
-        except:
+        except (ValueError, TypeError, OSError) as e:
+            self.logger.debug(f"Timestamp formatting failed for {timestamp}: {e}")
             return str(timestamp)
+    
+    def _check_rate_limit(self) -> bool:
+        """
+        Check if message storage is within rate limits.
+        Returns True if allowed, False if rate limited.
+        """
+        now = time.time()
+        cutoff = now - self.rate_limit_window
+        
+        # Remove timestamps outside the window
+        while self._message_timestamps and self._message_timestamps[0] < cutoff:
+            self._message_timestamps.popleft()
+        
+        if len(self._message_timestamps) >= self.rate_limit_count:
+            self.logger.warning(f"S&F: Rate limit exceeded ({self.rate_limit_count} messages in {self.rate_limit_window}s)")
+            return False
+        
+        return True
+    
+    def _check_total_message_limit(self) -> bool:
+        """
+        Check if total stored messages is within limits.
+        Returns True if allowed, False if at limit.
+        """
+        try:
+            rows = self.db_manager.execute_query('''
+                SELECT COUNT(*) as count FROM store_forward_messages
+                WHERE delivered = 0
+            ''')
+            if rows and rows[0]['count'] >= self.max_total_messages:
+                self.logger.warning(f"S&F: Total message limit reached ({self.max_total_messages})")
+                return False
+            return True
+        except Exception as e:
+            self.logger.error(f"S&F: Error checking total message limit: {e}")
+            return True  # Allow on error to avoid blocking legitimate messages
 
     def _check_filter(self, node_id: str, allow_list: List[str], disallow_list: List[str]) -> bool:
         """
@@ -116,6 +163,13 @@ class StoreForwardManager:
         
         if not self.enabled:
             self.logger.info("S&F: Disabled")
+            return False
+        
+        # Security: Check rate limits before processing
+        if not self._check_rate_limit():
+            return False
+        
+        if not self._check_total_message_limit():
             return False
             
         # Extract packet from message if available, otherwise try to reconstruct or fail
@@ -213,9 +267,24 @@ class StoreForwardManager:
             return True
 
     def _store_single_message(self, packet: Dict, to_node: str, from_node: str):
-        """Store a single message in the database"""
+        """Store a single message in the database with security validation"""
         try:
+            # Security: Sanitize message content before storage
+            if 'decoded' in packet and 'text' in packet['decoded']:
+                original_text = packet['decoded']['text']
+                packet['decoded']['text'] = sanitize_input(
+                    original_text, 
+                    max_length=1000,  # Reasonable limit for mesh messages
+                    strip_controls=True
+                )
+            
             packet_json = json.dumps(packet)
+            
+            # Security: Validate packet JSON size (prevent DoS via oversized packets)
+            if len(packet_json) > 10000:  # 10KB limit
+                self.logger.warning(f"S&F: Packet JSON too large ({len(packet_json)} bytes), dropping")
+                return
+            
             now = int(time.time())
             expires_at = now + (self.ttl_hours * 3600)
             
@@ -224,6 +293,9 @@ class StoreForwardManager:
                 (to_node, from_node, packet_json, created_at, expires_at, delivered)
                 VALUES (?, ?, ?, ?, ?, 0)
             ''', (to_node, from_node, packet_json, now, expires_at))
+            
+            # Record timestamp for rate limiting
+            self._message_timestamps.append(now)
             
             self._enforce_node_limit(to_node)
             
@@ -309,15 +381,16 @@ class StoreForwardManager:
                 ORDER BY m.created_at ASC
             ''', (int(time.time()), requesting_node_id))
             
-            # Filter by channel in Python
+            # Filter by channel in Python with validation
             for msg in raw_broadcasts:
-                try:
-                    packet = json.loads(msg['packet_json'])
+                # Security: Validate JSON before parsing
+                packet = validate_packet_json(msg['packet_json'])
+                if packet:
                     msg_channel = packet.get('channel_name')
                     if msg_channel and msg_channel.lower() == channel_filter.lower():
                         broadcast_msgs.append(msg)
-                except Exception as e:
-                    self.logger.error(f"Error parsing packet JSON for filtering: {e}")
+                else:
+                    self.logger.warning(f"S&F: Invalid packet JSON in message {msg['id']}, skipping")
         
         self.logger.info(f"S&F: Found {len(directed_msgs)} directed and {len(broadcast_msgs)} broadcast messages for {requesting_node_id} (Filter: {channel_filter})")
         
@@ -341,7 +414,12 @@ class StoreForwardManager:
         count = 0
         for msg in all_messages:
             try:
-                packet = json.loads(msg['packet_json'])
+                # Security: Validate JSON before use
+                packet = validate_packet_json(msg['packet_json'])
+                if not packet:
+                    self.logger.warning(f"S&F: Skipping message {msg['id']} with invalid JSON")
+                    continue
+                    
                 decoded = packet.get('decoded', {})
                 text = decoded.get('text', '')
                 

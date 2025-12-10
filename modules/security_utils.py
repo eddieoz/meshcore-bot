@@ -210,6 +210,108 @@ def validate_pubkey_format(pubkey: str, expected_length: int = 64) -> bool:
     return True
 
 
+def validate_node_id(node_id: str, allow_broadcast: bool = False) -> Optional[str]:
+    """
+    Validate and normalize a MeshCore node ID.
+    
+    Node IDs can be:
+    - Short ID: 12 hex characters (e.g., "85efbcc27971")
+    - Full pubkey: 64 hex characters
+    - With ! prefix: "!85efbcc27971"
+    - Broadcast: "^all", "ffffffff", "4294967295"
+    
+    Args:
+        node_id: The node ID to validate
+        allow_broadcast: Whether to accept broadcast addresses
+    
+    Returns:
+        Normalized node ID (lowercase, no ! prefix) or None if invalid
+    
+    Raises:
+        ValueError: If node ID format is invalid
+    """
+    if not node_id or not isinstance(node_id, str):
+        raise ValueError("Node ID must be a non-empty string")
+    
+    node_id = node_id.strip()
+    
+    # Check for broadcast addresses
+    broadcast_addresses = ['^all', 'ffffffff', '4294967295']
+    if node_id.lower() in broadcast_addresses:
+        if allow_broadcast:
+            return node_id.lower()
+        else:
+            raise ValueError("Broadcast addresses not allowed")
+    
+    # Remove ! prefix if present
+    if node_id.startswith('!'):
+        node_id = node_id[1:]
+    
+    # Must be valid hex
+    if not re.match(r'^[0-9a-fA-F]+$', node_id):
+        raise ValueError(f"Node ID must be hexadecimal, got: {node_id[:20]}...")
+    
+    # Validate length: short ID (8-12 chars) or full pubkey (64 chars)
+    valid_lengths = [8, 10, 12, 64]  # Common MeshCore ID lengths
+    if len(node_id) not in valid_lengths:
+        # For IDs that are too long but not pubkeys, log warning and truncate
+        if len(node_id) > 12 and len(node_id) != 64:
+            logger.warning(f"Non-standard node ID length {len(node_id)}, truncating to 12 chars")
+            node_id = node_id[:12]
+        elif len(node_id) < 8:
+            raise ValueError(f"Node ID too short: {len(node_id)} chars (minimum 8)")
+    
+    return node_id.lower()
+
+
+def validate_packet_json(packet_json: str, max_size: int = 10000) -> Optional[dict]:
+    """
+    Validate and parse a stored packet JSON string.
+    
+    Args:
+        packet_json: JSON string to validate
+        max_size: Maximum allowed size in bytes (default: 10KB)
+    
+    Returns:
+        Parsed dict if valid, None if invalid
+    """
+    if not packet_json or not isinstance(packet_json, str):
+        logger.warning("Invalid packet JSON: empty or not a string")
+        return None
+    
+    # Size check to prevent DoS
+    if len(packet_json) > max_size:
+        logger.warning(f"Packet JSON too large: {len(packet_json)} bytes (max {max_size})")
+        return None
+    
+    try:
+        import json
+        data = json.loads(packet_json)
+        
+        # Must be a dictionary
+        if not isinstance(data, dict):
+            logger.warning("Packet JSON must be a dictionary")
+            return None
+        
+        # Validate required structure
+        # Must have 'from' or 'from_node' field
+        if 'from' not in data and 'from_node' not in data:
+            logger.warning("Packet JSON missing 'from' or 'from_node' field")
+            return None
+        
+        # Must have decoded.text or be reconstructable
+        decoded = data.get('decoded', {})
+        if not isinstance(decoded, dict):
+            logger.warning("Packet 'decoded' field must be a dictionary")
+            return None
+        
+        return data
+        
+    except json.JSONDecodeError as e:
+        logger.warning(f"Invalid JSON in packet: {e}")
+        return None
+
+
 def validate_port_number(port: int, allow_privileged: bool = False) -> bool:
     """
     Validate port number
