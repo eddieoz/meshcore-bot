@@ -431,6 +431,14 @@ class MessageHandler:
                         hop_info = f" ({hop_count} hop{'s' if hop_count != 1 else ''})" if hop_count is not None else ""
                         
                         self.logger.info(f"📡 Tracked {mode}: {name}{location}{hop_info}")
+                        
+                        # Trigger Map Auto-Uploader if enabled
+                        if hasattr(self.bot, 'map_auto_uploader') and self.bot.map_auto_uploader:
+                            # We need the raw packet hex for the map link
+                            raw_packet_hex = packet_info.get('raw_hex')
+                            if raw_packet_hex:
+                                # Run as background task to avoid blocking message processing
+                                asyncio.create_task(self.bot.map_auto_uploader.process_advert(raw_packet_hex, advert_data))
                     else:
                         self.logger.warning(f"Failed to track contact advertisement: {advert_data.get('name', 'Unknown')}")
                 

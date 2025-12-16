@@ -108,6 +108,24 @@ startup_advert = false
 # false: Manual mode - no automatic actions, use !repeater commands to manage contacts (default)
 auto_manage_contacts = false
 
+[MapAutoUploader]
+# Enable automatic uploading of repeaters and rooms to map.meshcore.dev
+# true: Upload adverts to the online map
+# false: Disable map uploading (default)
+enabled = false
+
+# API URL for map uploads
+# Default: https://map.meshcore.dev/api/v1/uploader/node
+api_url = https://map.meshcore.dev/api/v1/uploader/node
+
+# Minimum time between uploads for the same node (seconds)
+# Prevents spamming the API with duplicate adverts
+# Default: 3600 (1 hour)
+upload_interval_seconds = 3600
+
+# API request timeout in seconds
+api_timeout = 10
+
 [Localization]
 # Language code for bot responses (en, es, es-MX, es-ES, fr, de, ja, etc.)
 # Default: en (English)

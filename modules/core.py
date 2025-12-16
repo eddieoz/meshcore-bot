@@ -38,6 +38,7 @@ from .web_viewer.integration import WebViewerIntegration
 from .web_viewer.integration import WebViewerIntegration
 from .security_utils import validate_safe_path
 from .store_forward import StoreForwardManager
+from .map_auto_uploader import MapAutoUploaderManager
 
 
 class MeshCoreBot:
@@ -155,6 +156,9 @@ class MeshCoreBot:
             self.logger.error(f"Failed to initialize Store & Forward manager: {e}")
             # Don't raise, just disable it
             self.store_forward_manager = None
+            
+        # Initialize Map Auto-Uploader (will be fully set up in connect() when key is available)
+        self.map_auto_uploader = None
         
         # Reload translated keywords for all commands now that translator is available
         # This ensures keywords are loaded even if translator wasn't ready during command init
@@ -675,6 +679,9 @@ use_zulu_time = false
                 # Setup message event handlers
                 await self.setup_message_handlers()
                 
+                # Initialize Map Auto-Uploader with private key
+                await self._init_map_uploader()
+                
                 return True
             else:
                 self.logger.error("Failed to connect to MeshCore node")
@@ -858,6 +865,33 @@ use_zulu_time = false
             except (AttributeError, TypeError):
                 print(f"Error during web viewer cleanup: {e}")
     
+    async def _init_map_uploader(self):
+        """Initialize Map Auto-Uploader by exporting private key from device"""
+        if not self.config.getboolean('MapAutoUploader', 'enabled', fallback=False):
+            return
+
+        self.logger.info("Initializing Map Auto-Uploader...")
+        try:
+            # Export private key from device
+            # This is required for signing uploads
+            self.logger.info("Exporting private key from device for map signing...")
+            result = await self.meshcore.commands.export_private_key()
+            
+            if result and hasattr(result, 'payload') and isinstance(result.payload, dict) and 'private_key' in result.payload:
+                private_key = result.payload['private_key']
+                self.map_auto_uploader = MapAutoUploaderManager(self, private_key)
+                self.logger.info("✅ Map Auto-Uploader initialized successfully")
+            else:
+                reason = "Unknown error"
+                if result and hasattr(result, 'payload') and isinstance(result.payload, dict):
+                    reason = result.payload.get('reason', 'Unknown error')
+                self.logger.warning(f"❌ Failed to export private key: {reason}")
+                self.logger.warning("Map Auto-Uploader will be DISABLED")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error initializing Map Auto-Uploader: {e}")
+            self.map_auto_uploader = None
+
     async def send_startup_advert(self):
         """Send a startup advert if enabled in config"""
         try:
