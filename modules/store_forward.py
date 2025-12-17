@@ -360,7 +360,7 @@ class StoreForwardManager:
         
         # 1. Get Directed Messages (Always deliver DMs)
         directed_msgs = self.db_manager.execute_query('''
-            SELECT id, packet_json, from_node, created_at
+            SELECT id, packet_json, from_node, created_at, to_node
             FROM store_forward_messages
             WHERE to_node = ? AND delivered = 0
             ORDER BY created_at ASC
@@ -371,7 +371,7 @@ class StoreForwardManager:
         if channel_filter:
             # Select messages where to_node is ^all AND id is NOT in receipts for this node
             raw_broadcasts = self.db_manager.execute_query('''
-                SELECT m.id, m.packet_json, m.from_node, m.created_at
+                SELECT m.id, m.packet_json, m.from_node, m.created_at, m.to_node
                 FROM store_forward_messages m
                 WHERE m.to_node = '^all' 
                 AND m.expires_at > ?
@@ -464,7 +464,8 @@ class StoreForwardManager:
                 if sent:
                     count += 1
                     # Mark as delivered or add receipt
-                    if packet.get('to') == '^all':
+                    # Mark as delivered or add receipt
+                    if msg.get('to_node') == '^all':
                         # Add receipt for broadcast
                         self.db_manager.execute_update('''
                             INSERT OR IGNORE INTO store_forward_receipts (message_id, node_id, delivered_at)
