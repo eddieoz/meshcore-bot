@@ -344,6 +344,8 @@ class MessageHandler:
                         packet_info = self.decode_meshcore_packet(raw_hex)
                         if packet_info:
                             self.logger.info(f"✅ SUCCESSFULLY DECODED RAW PACKET: {packet_info}")
+                            # Add raw_hex for map uploader
+                            packet_info['raw_hex'] = raw_hex
                             
                             # Check if this is an advertisement packet and track it
                             await self._process_advertisement_packet(packet_info, metadata)
@@ -432,13 +434,25 @@ class MessageHandler:
                         
                         self.logger.info(f"📡 Tracked {mode}: {name}{location}{hop_info}")
                         
-                        # Trigger Map Auto-Uploader if enabled
+                        # Trigger Map Auto-Uploader if enabled (only for repeaters and rooms)
                         if hasattr(self.bot, 'map_auto_uploader') and self.bot.map_auto_uploader:
-                            # We need the raw packet hex for the map link
-                            raw_packet_hex = packet_info.get('raw_hex')
-                            if raw_packet_hex:
-                                # Run as background task to avoid blocking message processing
-                                asyncio.create_task(self.bot.map_auto_uploader.process_advert(raw_packet_hex, advert_data))
+                            # Only upload repeaters and rooms, not companions or chat
+                            upload_mode = advert_data.get('mode', '').lower()
+                            if upload_mode in ['repeater', 'room', 'roomserver']:
+                                # We need the raw packet hex for the map link
+                                raw_packet_hex = packet_info.get('raw_hex')
+                                if raw_packet_hex:
+                                    # Run as background task to avoid blocking message processing
+                                    self.logger.info(f"Triggering map upload for {advert_data.get('name')}")
+                                    asyncio.create_task(self.bot.map_auto_uploader.process_advert(raw_packet_hex, advert_data))
+                                else:
+                                    self.logger.info(f"⚠️ Map upload skipped: No raw_hex in packet_info keys: {list(packet_info.keys())}")
+                        else:
+                             # Just for debugging purposes, remove later
+                             if not hasattr(self.bot, 'map_auto_uploader'):
+                                 self.logger.info("⚠️ Map upload skipped: No map_auto_uploader attr")
+                             elif not self.bot.map_auto_uploader:
+                                 self.logger.info("⚠️ Map upload skipped: map_auto_uploader is None")
                     else:
                         self.logger.warning(f"Failed to track contact advertisement: {advert_data.get('name', 'Unknown')}")
                 
@@ -546,6 +560,8 @@ class MessageHandler:
                             if routing_info['payload_type'] == 'ADVERT':
                                 # Add routing_info to decoded_packet so it's available in _process_advertisement_packet
                                 decoded_packet['routing_info'] = routing_info
+                                # Add raw_hex for map uploader
+                                decoded_packet['raw_hex'] = payload.get('raw_hex', '')
                                 # Create signal info from available data
                                 signal_info = {
                                     'snr': snr_value,

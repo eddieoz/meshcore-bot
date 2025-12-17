@@ -38,9 +38,11 @@ class MapAutoUploaderManager:
             # Ed25519 private key is typically 32 bytes seed + 32 bytes public key
             # cryptography library uses the 32-byte seed
             self.private_key = ed25519.Ed25519PrivateKey.from_private_bytes(uploader_private_key[:32])
-            self.public_key_bytes = uploader_private_key[32:]
+            # IMPORTANT: Use the library's derived public key, not the one from the 64-byte array
+            # This ensures consistency between signing and verification
+            self.public_key_bytes = self.private_key.public_key().public_bytes_raw()
             self.public_key_hex = self.public_key_bytes.hex()
-            self.logger.info(f"Initialized with signing key for: {self.public_key_hex}")
+            self.logger.info(f"Initialized with signing key")
         else:
             self.logger.error(f"Invalid private key length: {len(uploader_private_key)} bytes (expected 64)")
             self.enabled = False
@@ -149,7 +151,10 @@ class MapAutoUploaderManager:
 
             self.logger.info(f"Preparing upload for {mode}: {advert_data.get('name')} ({pubkey[:8]}...)")
             
-            # 4. Construct Payload
+            # Debug: Log packet hex info
+            self.logger.info(f"📦 Packet hex: length={len(packet_hex)} chars, sample: {packet_hex[:64]}...")
+            
+            #4. Construct Payload
             # Format:
             # {
             #   params: { freq, cr, sf, bw },
@@ -176,7 +181,7 @@ class MapAutoUploaderManager:
                     "sf": self.radio_params.get('sf', 8),
                     "bw": self.radio_params.get('bw', 62.5)
                 },
-                "links": [f"meshcore://{packet_hex}"]
+                "links": [f"meshcore://{packet_hex[4:]}"]
             }
             
             # 5. Sign Data
@@ -203,10 +208,17 @@ class MapAutoUploaderManager:
     async def upload_to_api(self, data: Dict[str, Any], node_name: str = "Unknown", node_id: str = "Unknown"):
         """Post the signed data to the API"""
         try:
+            # Debug: Log the request payload (truncate signature for readability)
+            debug_payload = data.copy()
+            if 'signature' in debug_payload:
+                debug_payload['signature'] = debug_payload['signature'][:32] + '...'
+            self.logger.info(f"📤 Request payload: {json.dumps(debug_payload, indent=2)}")
+            
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     self.api_url, 
-                    json=data, 
+                    json=data,
+                    headers={'Content-Type': 'application/json'},
                     timeout=self.api_timeout
                 ) as response:
                     if response.status in [200, 201]:
