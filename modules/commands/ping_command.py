@@ -13,7 +13,7 @@ class PingCommand(BaseCommand):
     
     # Plugin metadata
     name = "ping"
-    keywords = ['ping']
+    keywords = ['ping', '!ping']
     description = "Responds to 'ping' with 'Pong!'"
     category = "basic"
     

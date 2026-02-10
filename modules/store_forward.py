@@ -326,6 +326,21 @@ class StoreForwardManager:
                 ''', (node_id, limit))
         except Exception as e:
             self.logger.error(f"Failed to enforce limit: {e}")
+    def get_pending_broadcasts(self, node_id: str) -> List[Dict]:
+        """Get all pending broadcast messages for a node"""
+        now = int(time.time())
+        # Select messages where to_node is ^all AND id is NOT in receipts for this node
+        return self.db_manager.execute_query('''
+            SELECT m.id, m.packet_json, m.from_node, m.created_at, m.to_node
+            FROM store_forward_messages m
+            WHERE m.to_node = '^all' 
+            AND m.expires_at > ?
+            AND NOT EXISTS (
+                SELECT 1 FROM store_forward_receipts r 
+                WHERE r.message_id = m.id AND r.node_id = ?
+            )
+            ORDER BY m.created_at ASC
+        ''', (now, node_id))
 
     async def deliver_messages(self, message, requesting_node_id: str, channel_filter: Optional[str] = None):
         """
@@ -368,6 +383,8 @@ class StoreForwardManager:
         
         # 2. Get Broadcast Messages (Only if channel_filter is set)
         broadcast_msgs = []
+        broadcast_summary_text = ""
+
         if channel_filter:
             # Select messages where to_node is ^all AND id is NOT in receipts for this node
             raw_broadcasts = self.db_manager.execute_query('''
@@ -392,6 +409,29 @@ class StoreForwardManager:
                         broadcast_msgs.append(msg)
                 else:
                     self.logger.warning(f"S&F: Invalid packet JSON in message {msg['id']}, skipping")
+        else:
+            # DM without filter: Calculate summary of valid pending broadcasts
+            pending = self.get_pending_broadcasts(requesting_node_id)
+            if pending:
+                summary = {}
+                for msg in pending:
+                    packet = validate_packet_json(msg['packet_json'])
+                    if packet:
+                        # Normalize channel name
+                        ch = packet.get('channel_name', 'primary') 
+                        # Only show channel name if it's not None/empty, otherwise 'primary' or 'unknown'?
+                        # packet.get('channel_name') might be None if not set.
+                        if not ch:
+                            ch = 'primary'
+                        summary[ch] = summary.get(ch, 0) + 1
+                
+                if summary:
+                    lines = ["\n\nBroadcasts waiting:"]
+                    # Sort by channel name
+                    for ch in sorted(summary.keys()):
+                        lines.append(f"- #{ch}: {summary[ch]}")
+                    lines.append("\nUsage: !get <channel>")
+                    broadcast_summary_text = "\n".join(lines)
         
         self.logger.info(f"S&F: Found {len(directed_msgs)} directed and {len(broadcast_msgs)} broadcast messages for {requesting_node_id} (Filter: {channel_filter})")
         
@@ -406,7 +446,7 @@ class StoreForwardManager:
                 # Channel: send DM to sender for privacy
                 return await self.bot.command_manager.send_dm(sender_name, content)
         
-        if not all_messages:
+        if not all_messages and not broadcast_summary_text:
             await send_private("No stored messages found.")
             return
 
@@ -491,7 +531,7 @@ class StoreForwardManager:
                 self.logger.info(f"S&F: Rate limited, waiting {wait_time:.1f}s before sending summary")
                 await asyncio.sleep(wait_time + 0.5)
         
-        await send_private(f"Delivered {count} messages.")
+        await send_private(f"Delivered {count} messages.{broadcast_summary_text}")
 
     def _format_message_for_delivery(self, packet: Dict, from_node: str, created_at: int) -> str:
         """Format the message with metadata"""

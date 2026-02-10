@@ -18,7 +18,7 @@ class TestCommand(BaseCommand):
     
     # Plugin metadata
     name = "test"
-    keywords = ['test', 't']
+    keywords = ['test', 't', '!test', '!t']
     description = "Responds to 'test' or 't' with connection info"
     category = "basic"
     
@@ -40,8 +40,9 @@ class TestCommand(BaseCommand):
         content = self.clean_content(message.content)
         
         # Strip exclamation mark if present (for command-style messages)
-        # if content.startswith('!'):
-        #     content = content[1:].strip()
+        # Strip exclamation mark if present (for command-style messages)
+        if content.startswith('!'):
+            content = content[1:].strip()
         
         # Handle "test" alone or "test " with phrase
         if content.lower() == "test":
