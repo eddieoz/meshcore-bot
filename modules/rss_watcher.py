@@ -105,6 +105,13 @@ class RssWatcher:
                     title = entry.get('title', 'No Title')
                     link = entry.get('link', '')
                     
+                    # Ensure the message fits safely within mesh payload limits (~150-160 bytes).
+                    # We prioritize the link by capping the title length dynamically.
+                    from .utils import truncate_string
+                    # Target 140 to be very safe limit, formatting takes ~11 chars.
+                    max_title_len = max(5, 140 - len(link) - 11)
+                    title = truncate_string(title, max_title_len)
+                    
                     message = f"📰 {title}\n🔗 {link}"
                     self.logger.info(f"Broadcasting new RSS article '{title}' to channel {self.channel}")
                     
