@@ -142,3 +142,5 @@ test_scripts/
 meshtastic-bridge/
 meshtastic-bridge
 refs/
+.serena
+config copy.ini

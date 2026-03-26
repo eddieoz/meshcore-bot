@@ -39,6 +39,7 @@ from .web_viewer.integration import WebViewerIntegration
 from .security_utils import validate_safe_path
 from .store_forward import StoreForwardManager
 from .map_auto_uploader import MapAutoUploaderManager
+from .rss_watcher import RssWatcher
 
 
 class MeshCoreBot:
@@ -159,6 +160,10 @@ class MeshCoreBot:
             
         # Initialize Map Auto-Uploader (will be fully set up in connect() when key is available)
         self.map_auto_uploader = None
+        
+        # Initialize RSS Watcher
+        self.logger.info("Initializing RSS Watcher")
+        self.rss_watcher = RssWatcher(self)
         
         # Reload translated keywords for all commands now that translator is available
         # This ensures keywords are loaded even if translator wasn't ready during command init
@@ -783,6 +788,9 @@ use_zulu_time = false
         
         # Start scheduler thread
         self.scheduler.start()
+        
+        # Start RSS Watcher polling loop
+        self.rss_watcher.start()
         
         # Start web viewer if enabled
         if self.web_viewer_integration and self.web_viewer_integration.enabled:

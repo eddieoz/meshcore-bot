@@ -736,3 +736,19 @@ debug = false
 # true: Start web viewer automatically when bot starts
 # false: Start web viewer manually (recommended)
 auto_start = false
+
+[RSS]
+# Enable or disable the RSS Watcher
+# true: Bot will periodically poll configured RSS feeds
+# false: RSS Watcher is disabled
+enabled = false
+
+# How often to check for new articles (in minutes)
+interval_minutes = 1
+
+# Channel to broadcast new articles
+channel = #bot-teste
+
+# Configure feeds using keys starting with 'rss_'
+# Format: rss_name = URL
+# rss_kriis = https://www.kriis.ee/en/rss-feeds/rss.xml
