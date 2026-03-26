@@ -23,9 +23,12 @@ class StoreForwardCommand(BaseCommand):
         Returns:
             Validated and normalized node ID, or None if invalid
         """
-        node_id = message.sender_id
-        
-        # First, check if sender_id looks like a name (not a hex string)
+        # Prefer sender_pubkey if available, otherwise use sender_id
+        node_id = message.sender_pubkey or message.sender_id
+        if node_id and node_id.startswith('!'):
+            node_id = node_id[1:]
+            
+        # First, check if node_id looks like a hex string
         is_hex = False
         try:
             int(node_id, 16)
@@ -35,9 +38,13 @@ class StoreForwardCommand(BaseCommand):
         
         if not is_hex:
             # Try to resolve name to hex ID from contacts
+            lookup_name = (message.sender_id or node_id).lower()
             if hasattr(self.bot, 'meshcore') and hasattr(self.bot.meshcore, 'contacts'):
                 for contact_key, contact_data in self.bot.meshcore.contacts.items():
-                    if contact_data.get('adv_name') == node_id:
+                    adv_name = contact_data.get('adv_name', '').lower()
+                    name = contact_data.get('name', '').lower()
+                    
+                    if adv_name == lookup_name or name == lookup_name:
                         # Found the contact by name, use the key (which is the hex ID)
                         if contact_key.startswith('!'):
                             node_id = contact_key[1:]
